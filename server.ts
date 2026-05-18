@@ -18,9 +18,19 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
 
-// Initialize Neon database connection
-const sql = neon(process.env.DATABASE_URL || 'postgres://localhost/mydb');
-const db = drizzle(sql, { schema });
+// Initialize Neon database connection with safer logging
+let sql: any;
+let db: any;
+try {
+  if (!process.env.DATABASE_URL) {
+    console.error('DATABASE_URL not set in environment');
+  }
+  sql = neon(process.env.DATABASE_URL || 'postgres://localhost/mydb');
+  db = drizzle(sql, { schema });
+} catch (err) {
+  console.error('Failed to initialize Neon/Drizzle DB connection:', err);
+  throw err;
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -198,6 +208,18 @@ app.get('/api/settings', asyncHandler(async (req, res) => {
     settingsDb = await db.insert(schema.settings).values({ id: 'global', adminWhatsApp: '', bankInfo: '[]', systemName: 'RifasPremium', aboutUs: '', address: '', contactPhone: '', contactEmail: '', facebookUrl: '', instagramUrl: '' }).returning();
   }
   res.json(settingsDb[0]);
+}));
+
+// DB health check for debugging deployments (returns 200 if a simple query succeeds)
+app.get('/api/db-health', asyncHandler(async (req, res) => {
+  try {
+    // simple lightweight query using ORM to confirm connection
+    await db.select().from(schema.raffles).limit(1);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('DB health check failed:', err);
+    res.status(500).json({ ok: false, error: 'DB connection failed' });
+  }
 }));
 
 app.put('/api/settings', authenticateToken, asyncHandler(async (req, res) => {
