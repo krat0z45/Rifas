@@ -18,12 +18,12 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
 
-// Validar que la variable de entorno exista antes de inicializar la DB
+// Validar que la variable de entorno exista
 if (!process.env.DATABASE_URL) {
   console.error('CRITICAL ERROR: DATABASE_URL is not set in the environment variables!');
 }
 
-// Inicialización optimizada para Vercel Serverless (Usa la URL directa de Neon sin "-pooler")
+// Conexión Directa optimizada para el entorno de producción en Vercel
 const sql = neon(process.env.DATABASE_URL || 'postgres://localhost/mydb');
 const db = drizzle(sql, { schema });
 
@@ -243,7 +243,6 @@ app.delete('/api/users/:id', authenticateToken, asyncHandler(async (req, res) =>
   res.json({ success: true });
 }));
 
-// --- MANEJO DE ENTORNO LOCAL VS VERCEL ---
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -252,7 +251,6 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    // Si estamos en producción local tradicional (VPS), servimos la carpeta dist
     if (!process.env.VERCEL) {
       const distPath = path.join(process.cwd(), 'dist');
       app.use(express.static(distPath));
@@ -262,7 +260,6 @@ async function startServer() {
     }
   }
 
-  // Vercel no usa app.listen(). Solo levanta el puerto en local o VPS tradicionales.
   if (!process.env.VERCEL) {
     const PORT = 3000;
     app.listen(PORT, "0.0.0.0", () => {
