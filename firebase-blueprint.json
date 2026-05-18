@@ -1,0 +1,61 @@
+{
+  "entities": {
+    "Raffle": {
+      "title": "Raffle",
+      "description": "A raffle event",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "instructions": { "type": "string" },
+        "prizeImageUrl": { "type": "string" },
+        "totalTickets": { "type": "number" },
+        "ticketPrice": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "paused", "completed"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["title", "totalTickets", "ticketPrice", "status"]
+    },
+    "Reservation": {
+      "title": "Reservation",
+      "description": "A ticket reservation request",
+      "type": "object",
+      "properties": {
+        "raffleId": { "type": "string" },
+        "folio": { "type": "string" },
+        "ticketNumbers": { "type": "array", "items": { "type": "number" } },
+        "userId": { "type": ["string", "null"] },
+        "purchaserName": { "type": "string" },
+        "phone": { "type": "string" },
+        "city": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "totalAmount": { "type": "number" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["raffleId", "folio", "ticketNumbers", "purchaserName", "phone", "city", "status"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Global Settings",
+      "type": "object",
+      "properties": {
+        "adminWhatsApp": { "type": "string" },
+        "bankInfo": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "raffles/{raffleId}": {
+      "schema": { "$ref": "#/entities/Raffle" },
+      "description": "Stores raffle events"
+    },
+    "reservations/{reservationId}": {
+      "schema": { "$ref": "#/entities/Reservation" },
+      "description": "Stores ticket reservations"
+    },
+    "settings/global": {
+      "schema": { "$ref": "#/entities/Settings" },
+      "description": "Stores global app settings"
+    }
+  }
+}

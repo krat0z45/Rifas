@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id        String  @id
+  email     String?
+  createdAt DateTime?
+}
+
+enum RaffleStatus {
+  active
+  paused
+  completed
+}
+
+model Raffle {
+  id            String   @id
+  title         String
+  description   String
+  instructions  String?
+  prizeImageUrl String?
+  totalTickets  Int
+  ticketPrice   Float
+  status        RaffleStatus
+  createdAt     DateTime?
+  reservations  Reservation[]
+}
+
+enum ReservationStatus {
+  pending
+  approved
+  rejected
+}
+
+model Reservation {
+  id           String            @id
+  raffleId     String
+  purchaserName String
+  phone        String
+  city         String
+  folio        String
+  ticketNumbers Json
+  status       ReservationStatus
+  totalAmount  Float
+  createdAt    DateTime?
+
+  raffle Raffle? @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+}
+
+model Setting {
+  id           String @id
+  adminWhatsApp String?
+  bankInfo     String?
+}

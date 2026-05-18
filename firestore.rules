@@ -1,0 +1,61 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.token.email == "motokrat0z@gmail.com";
+      allow delete: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /raffles/{raffleId} {
+      allow read: if true; // Public can read raffles
+      allow write: if isAdmin();
+    }
+
+    match /reservations/{reservationId} {
+      // Users can read their own reservations via folio or if admin
+      // Since unauthenticated users can create reservations, we can't secure read by auth.
+      // Wait, user asked for public users to buy tickets...
+      // Does public mean literally no login? Usually raffles in LatAm are bought without login, just name/phone.
+      // We will allow anyone to create a reservation.
+      // But only admins can read all, or update.
+      allow read: if isAdmin();
+      
+      // Allow create if it has required fields
+      allow create: if 
+        incoming().keys().hasAll(["raffleId", "folio", "ticketNumbers", "purchaserName", "phone", "city", "status"]) &&
+        incoming().ticketNumbers is list &&
+        incoming().ticketNumbers.size() > 0 && 
+        incoming().ticketNumbers.size() <= 100 &&
+        incoming().status == 'pending' &&
+        exists(/databases/$(database)/documents/raffles/$(incoming().raffleId));
+      
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+  }
+}
