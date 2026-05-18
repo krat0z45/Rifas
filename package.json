@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build": "esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && vite build",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
@@ -27,6 +27,7 @@
     "date-fns": "^4.1.0",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
+    "esbuild": "^0.25.12",
     "express": "^4.22.2",
     "firebase": "^12.13.0",
     "framer-motion": "^12.38.0",
@@ -57,10 +58,8 @@
     "@types/uuid": "^10.0.0",
     "autoprefixer": "^10.4.21",
     "drizzle-kit": "^0.31.10",
-    "esbuild": "^0.25.12",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.22.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.3"
+    "typescript": "~5.8.2"
   }
 }
