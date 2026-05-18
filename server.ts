@@ -11,6 +11,7 @@ import dotenv from 'dotenv';
 import { eq, desc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
+// Forzar la lectura del entorno antes de inicializar la DB
 dotenv.config();
 
 const app = express();
@@ -23,7 +24,7 @@ if (!process.env.DATABASE_URL) {
   console.error('CRITICAL ERROR: DATABASE_URL is not set in the environment variables!');
 }
 
-// Conexión Directa optimizada para el entorno de producción en Vercel
+// Inicialización limpia de Drizzle (Usa la URL directa de Neon sin "-pooler" en Vercel)
 const sql = neon(process.env.DATABASE_URL || 'postgres://localhost/mydb');
 const db = drizzle(sql, { schema });
 
