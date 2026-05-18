@@ -18,19 +18,14 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
 
-// Initialize Neon database connection with safer logging
-let sql: any;
-let db: any;
-try {
-  if (!process.env.DATABASE_URL) {
-    console.error('DATABASE_URL not set in environment');
-  }
-  sql = neon(process.env.DATABASE_URL || 'postgres://localhost/mydb');
-  db = drizzle(sql, { schema });
-} catch (err) {
-  console.error('Failed to initialize Neon/Drizzle DB connection:', err);
-  throw err;
+// Validar que la variable de entorno exista antes de inicializar la DB
+if (!process.env.DATABASE_URL) {
+  console.error('CRITICAL ERROR: DATABASE_URL is not set in the environment variables!');
 }
+
+// Inicialización optimizada para Vercel Serverless (Usa la URL directa de Neon sin "-pooler")
+const sql = neon(process.env.DATABASE_URL || 'postgres://localhost/mydb');
+const db = drizzle(sql, { schema });
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -53,7 +48,7 @@ const asyncHandler = (fn: express.RequestHandler) => (req: express.Request, res:
   Promise.resolve(fn(req as any, res as any, next)).catch(next);
 };
 
-// --- AUTH MOCK / NEON ROUTES ---
+// --- AUTH ROUTES ---
 app.post('/api/auth/register', asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   const existingUser = await db.select().from(schema.users).where(eq(schema.users.email, email)).limit(1);
@@ -156,7 +151,6 @@ app.get('/api/reservations/folio/:folio', asyncHandler(async (req, res) => {
     return res.status(404).json({ error: 'Folio not found' });
   }
 
-  // Also fetch raffle details so we can show them
   const raffleData = await db.select().from(schema.raffles)
     .where(eq(schema.raffles.id, data[0].raffleId))
     .limit(1);
@@ -184,7 +178,6 @@ app.get('/api/metrics', authenticateToken, asyncHandler(async (req, res) => {
   const totalRevenue = approvedReservations.reduce((sum, r) => sum + r.totalAmount, 0);
   const totalTicketsSold = approvedReservations.reduce((sum, r) => sum + r.ticketNumbers.length, 0);
   
-  // Sales over time (by month/day etc) simple group by status
   const salesByStatus = [
     { name: 'Aprobados', value: approvedReservations.length },
     { name: 'Pendientes', value: reservations.filter(r => r.status === 'pending').length },
@@ -210,26 +203,23 @@ app.get('/api/settings', asyncHandler(async (req, res) => {
   res.json(settingsDb[0]);
 }));
 
-// DB health check for debugging deployments (returns 200 if a simple query succeeds)
-app.get('/api/db-health', asyncHandler(async (req, res) => {
-  try {
-    // simple lightweight query using ORM to confirm connection
-    await db.select().from(schema.raffles).limit(1);
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('DB health check failed:', err);
-    res.status(500).json({ ok: false, error: 'DB connection failed' });
-  }
-}));
-
 app.put('/api/settings', authenticateToken, asyncHandler(async (req, res) => {
-  console.log('PUT /api/settings req.body:', req.body);
   const updated = await db.update(schema.settings)
     .set(req.body)
     .where(eq(schema.settings.id, 'global'))
     .returning();
-  console.log('PUT /api/settings updated:', updated);
   res.json(updated[0]);
+}));
+
+// --- DB HEALTH CHECK ---
+app.get('/api/db-health', asyncHandler(async (req, res) => {
+  try {
+    await db.select().from(schema.raffles).limit(1);
+    res.json({ ok: true, message: "Database connection successful!" });
+  } catch (err: any) {
+    console.error('DB health check failed:', err);
+    res.status(500).json({ ok: false, error: 'DB connection failed', details: err.message });
+  }
 }));
 
 // --- USERS ---
@@ -242,7 +232,7 @@ app.post('/api/users', authenticateToken, asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   const newRef = await db.insert(schema.users).values({
     email,
-    password, // In a real app we would hash this
+    password, 
     createdAt: new Date(),
   }).returning({ id: schema.users.id, email: schema.users.email });
   res.json(newRef[0]);
@@ -253,6 +243,7 @@ app.delete('/api/users/:id', authenticateToken, asyncHandler(async (req, res) =>
   res.json({ success: true });
 }));
 
+// --- MANEJO DE ENTORNO LOCAL VS VERCEL ---
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -261,6 +252,7 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
+    // Si estamos en producción local tradicional (VPS), servimos la carpeta dist
     if (!process.env.VERCEL) {
       const distPath = path.join(process.cwd(), 'dist');
       app.use(express.static(distPath));
@@ -270,6 +262,7 @@ async function startServer() {
     }
   }
 
+  // Vercel no usa app.listen(). Solo levanta el puerto en local o VPS tradicionales.
   if (!process.env.VERCEL) {
     const PORT = 3000;
     app.listen(PORT, "0.0.0.0", () => {
