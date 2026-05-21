@@ -6,6 +6,8 @@ import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
 
+import { PrismaPg } from '@prisma/adapter-pg';
+
 dotenv.config();
 
 const app = express();
@@ -13,7 +15,8 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
 
-const prisma = new PrismaClient();
+const adapter = new PrismaPg(process.env.DATABASE_URL || '');
+const prisma = new PrismaClient({ adapter });
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
