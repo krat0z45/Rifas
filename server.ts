@@ -2,16 +2,12 @@ import express from 'express';
 import path from 'path';
 import cors from 'cors';
 import { createServer as createViteServer } from 'vite';
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
-import * as schema from './src/db/schema.js';
+import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
-import { eq, desc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
-// Forzar la lectura del entorno antes de inicializar la DB
 dotenv.config();
 
 const app = express();
@@ -19,14 +15,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
 
-// Validar que la variable de entorno exista
-if (!process.env.DATABASE_URL) {
-  console.error('CRITICAL ERROR: DATABASE_URL is not set in the environment variables!');
-}
-
-// Inicialización limpia de Drizzle (Usa la URL directa de Neon sin "-pooler" en Vercel)
-const sql = neon(process.env.DATABASE_URL || 'postgres://localhost/mydb');
-const db = drizzle(sql, { schema });
+const prisma = new PrismaClient();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -49,28 +38,26 @@ const asyncHandler = (fn: express.RequestHandler) => (req: express.Request, res:
   Promise.resolve(fn(req as any, res as any, next)).catch(next);
 };
 
-// --- AUTH ROUTES ---
+// --- AUTH MOCK / NEON ROUTES ---
 app.post('/api/auth/register', asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  const existingUser = await db.select().from(schema.users).where(eq(schema.users.email, email)).limit(1);
-  if (existingUser.length > 0) {
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (existingUser) {
     return res.status(400).json({ error: 'User already exists' });
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
-  const newUser = await db.insert(schema.users).values({
-    email,
-    password: hashedPassword,
-  }).returning();
+  const newUser = await prisma.user.create({
+    data: { email, password: hashedPassword }
+  });
 
-  const token = jwt.sign({ id: newUser[0].id, email: newUser[0].email }, JWT_SECRET, { expiresIn: '7d' });
-  res.json({ token, user: { id: newUser[0].id, email: newUser[0].email } });
+  const token = jwt.sign({ id: newUser.id, email: newUser.email }, JWT_SECRET, { expiresIn: '7d' });
+  res.json({ token, user: { id: newUser.id, email: newUser.email } });
 }));
 
 app.post('/api/auth/login', asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  const users = await db.select().from(schema.users).where(eq(schema.users.email, email)).limit(1);
-  const user = users[0];
+  const user = await prisma.user.findUnique({ where: { email } });
 
   if (!user || !(await bcrypt.compare(password, user.password))) {
     return res.status(401).json({ error: 'Invalid credentials' });
@@ -86,99 +73,101 @@ app.get('/api/auth/me', authenticateToken, (req, res) => {
 
 // --- RAFFLES ---
 app.get('/api/raffles', asyncHandler(async (req, res) => {
-  const allRaffles = await db.select().from(schema.raffles).orderBy(desc(schema.raffles.createdAt));
+  const allRaffles = await prisma.raffle.findMany({ orderBy: { createdAt: 'desc' } });
   res.json(allRaffles);
 }));
 
 app.get('/api/raffles/:id', asyncHandler(async (req, res) => {
-  const data = await db.select().from(schema.raffles).where(eq(schema.raffles.id, req.params.id)).limit(1);
-  res.json(data[0] || null);
+  const data = await prisma.raffle.findUnique({ where: { id: req.params.id } });
+  res.json(data || null);
 }));
 
 app.get('/api/raffles/:id/reservations', asyncHandler(async (req, res) => {
-  const data = await db.select().from(schema.reservations).where(eq(schema.reservations.raffleId, req.params.id));
+  const data = await prisma.reservation.findMany({ where: { raffleId: req.params.id } });
   res.json(data);
 }));
 
 app.post('/api/raffles', authenticateToken, asyncHandler(async (req, res) => {
-  const newRaffle = await db.insert(schema.raffles).values({
-    id: uuidv4(),
-    ...req.body,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }).returning();
-  res.json(newRaffle[0]);
+  const newRaffle = await prisma.raffle.create({
+    data: {
+      ...req.body,
+      id: uuidv4(),
+    }
+  });
+  res.json(newRaffle);
 }));
 
 app.put('/api/raffles/:id', authenticateToken, asyncHandler(async (req, res) => {
-  const updated = await db.update(schema.raffles)
-    .set({ ...req.body, updatedAt: new Date() })
-    .where(eq(schema.raffles.id, req.params.id))
-    .returning();
-  res.json(updated[0]);
+  const updated = await prisma.raffle.update({
+    where: { id: req.params.id },
+    data: req.body
+  });
+  res.json(updated);
 }));
 
 // --- RESERVATIONS ---
 app.get('/api/reservations', authenticateToken, asyncHandler(async (req, res) => {
-  const data = await db.select().from(schema.reservations).orderBy(desc(schema.reservations.createdAt));
+  const data = await prisma.reservation.findMany({ orderBy: { createdAt: 'desc' } });
   res.json(data);
 }));
 
 app.post('/api/reservations', asyncHandler(async (req, res) => {
-  const newRef = await db.insert(schema.reservations).values({
-    id: uuidv4(),
-    ...req.body,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }).returning();
-  res.json(newRef[0]);
+  const newRef = await prisma.reservation.create({
+    data: {
+      ...req.body,
+      id: uuidv4(),
+    }
+  });
+  res.json(newRef);
 }));
 
 app.put('/api/reservations/:id/status', authenticateToken, asyncHandler(async (req, res) => {
   const { status } = req.body;
-  const updated = await db.update(schema.reservations)
-    .set({ status, updatedAt: new Date() })
-    .where(eq(schema.reservations.id, req.params.id))
-    .returning();
-  res.json(updated[0]);
+  const updated = await prisma.reservation.update({
+    where: { id: req.params.id },
+    data: { status }
+  });
+  res.json(updated);
 }));
 
 app.get('/api/reservations/folio/:folio', asyncHandler(async (req, res) => {
-  const data = await db.select().from(schema.reservations)
-    .where(eq(schema.reservations.folio, req.params.folio))
-    .limit(1);
+  const data = await prisma.reservation.findFirst({
+    where: { folio: req.params.folio }
+  });
     
-  if (data.length === 0) {
+  if (!data) {
     return res.status(404).json({ error: 'Folio not found' });
   }
 
-  const raffleData = await db.select().from(schema.raffles)
-    .where(eq(schema.raffles.id, data[0].raffleId))
-    .limit(1);
+  // Also fetch raffle details so we can show them
+  const raffleData = await prisma.raffle.findUnique({
+    where: { id: data.raffleId }
+  });
 
   res.json({
-    folio: data[0].folio,
-    status: data[0].status,
-    ticketNumbers: data[0].ticketNumbers,
-    raffleId: data[0].raffleId,
-    raffleTitle: raffleData[0]?.title || 'Rifa',
-    totalAmount: data[0].totalAmount,
-    purchaserName: data[0].purchaserName
+    folio: data.folio,
+    status: data.status,
+    ticketNumbers: data.ticketNumbers,
+    raffleId: data.raffleId,
+    raffleTitle: raffleData?.title || 'Rifa',
+    totalAmount: data.totalAmount,
+    purchaserName: data.purchaserName
   });
 }));
 
 // --- METRICS ---
 app.get('/api/metrics', authenticateToken, asyncHandler(async (req, res) => {
-  const raffles = await db.select().from(schema.raffles);
-  const reservations = await db.select().from(schema.reservations);
+  const raffles = await prisma.raffle.findMany();
+  const reservations = await prisma.reservation.findMany();
   
   const totalRaffles = raffles.length;
   const activeRaffles = raffles.filter(r => r.status === 'active').length;
   
   const approvedReservations = reservations.filter(r => r.status === 'approved');
   const totalRevenue = approvedReservations.reduce((sum, r) => sum + r.totalAmount, 0);
-  const totalTicketsSold = approvedReservations.reduce((sum, r) => sum + r.ticketNumbers.length, 0);
+  const totalTicketsSold = approvedReservations.reduce((sum, r) => sum + (Array.isArray(r.ticketNumbers) ? r.ticketNumbers.length : 0), 0);
   
+  // Sales over time (by month/day etc) simple group by status
   const salesByStatus = [
     { name: 'Aprobados', value: approvedReservations.length },
     { name: 'Pendientes', value: reservations.filter(r => r.status === 'pending').length },
@@ -197,50 +186,45 @@ app.get('/api/metrics', authenticateToken, asyncHandler(async (req, res) => {
 
 // --- SETTINGS ---
 app.get('/api/settings', asyncHandler(async (req, res) => {
-  let settingsDb = await db.select().from(schema.settings).where(eq(schema.settings.id, 'global')).limit(1);
-  if (settingsDb.length === 0) {
-    settingsDb = await db.insert(schema.settings).values({ id: 'global', adminWhatsApp: '', bankInfo: '[]', systemName: 'RifasPremium', aboutUs: '', address: '', contactPhone: '', contactEmail: '', facebookUrl: '', instagramUrl: '' }).returning();
+  let settingsDb = await prisma.setting.findUnique({ where: { id: 'global' } });
+  if (!settingsDb) {
+    settingsDb = await prisma.setting.create({
+      data: { id: 'global', adminWhatsApp: '', bankInfo: '[]', systemName: 'RifasPremium', aboutUs: '', address: '', contactPhone: '', contactEmail: '', facebookUrl: '', instagramUrl: '' }
+    });
   }
-  res.json(settingsDb[0]);
+  res.json(settingsDb);
 }));
 
 app.put('/api/settings', authenticateToken, asyncHandler(async (req, res) => {
-  const updated = await db.update(schema.settings)
-    .set(req.body)
-    .where(eq(schema.settings.id, 'global'))
-    .returning();
-  res.json(updated[0]);
-}));
-
-// --- DB HEALTH CHECK ---
-app.get('/api/db-health', asyncHandler(async (req, res) => {
-  try {
-    await db.select().from(schema.raffles).limit(1);
-    res.json({ ok: true, message: "Database connection successful!" });
-  } catch (err: any) {
-    console.error('DB health check failed:', err);
-    res.status(500).json({ ok: false, error: 'DB connection failed', details: err.message });
-  }
+  console.log('PUT /api/settings req.body:', req.body);
+  const updated = await prisma.setting.update({
+    where: { id: 'global' },
+    data: req.body
+  });
+  console.log('PUT /api/settings updated:', updated);
+  res.json(updated);
 }));
 
 // --- USERS ---
 app.get('/api/users', authenticateToken, asyncHandler(async (req, res) => {
-  const data = await db.select({ id: schema.users.id, email: schema.users.email, createdAt: schema.users.createdAt }).from(schema.users);
+  const data = await prisma.user.findMany({ select: { id: true, email: true, createdAt: true } });
   res.json(data);
 }));
 
 app.post('/api/users', authenticateToken, asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  const newRef = await db.insert(schema.users).values({
-    email,
-    password, 
-    createdAt: new Date(),
-  }).returning({ id: schema.users.id, email: schema.users.email });
-  res.json(newRef[0]);
+  const newRef = await prisma.user.create({
+    data: {
+      email,
+      password, // In a real app we would hash this
+    },
+    select: { id: true, email: true }
+  });
+  res.json(newRef);
 }));
 
 app.delete('/api/users/:id', authenticateToken, asyncHandler(async (req, res) => {
-  await db.delete(schema.users).where(eq(schema.users.id, parseInt(req.params.id)));
+  await prisma.user.delete({ where: { id: parseInt(req.params.id) } });
   res.json({ success: true });
 }));
 

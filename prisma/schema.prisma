@@ -1,60 +1,69 @@
+// This is your Prisma schema file
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
-model Admin {
-  id        String  @id
-  email     String?
-  createdAt DateTime?
-}
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now()) @map("created_at")
 
-enum RaffleStatus {
-  active
-  paused
-  completed
+  @@map("users")
 }
 
 model Raffle {
   id            String   @id
   title         String
   description   String
-  instructions  String?
-  prizeImageUrl String?
-  totalTickets  Int
-  ticketPrice   Float
-  status        RaffleStatus
-  createdAt     DateTime?
-  reservations  Reservation[]
-}
+  prizeImageUrl String   @map("prize_image_url")
+  images        String?
+  totalTickets  Int      @map("total_tickets")
+  ticketPrice   Int      @map("ticket_price")
+  status        String
+  instructions  String
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
 
-enum ReservationStatus {
-  pending
-  approved
-  rejected
+  reservations Reservation[]
+
+  @@map("raffles")
 }
 
 model Reservation {
-  id           String            @id
-  raffleId     String
-  purchaserName String
-  phone        String
-  city         String
-  folio        String
-  ticketNumbers Json
-  status       ReservationStatus
-  totalAmount  Float
-  createdAt    DateTime?
+  id            String   @id
+  folio         String
+  raffleId      String   @map("raffle_id")
+  purchaserName String   @map("purchaser_name")
+  phone         String
+  city          String
+  ticketNumbers Json     @map("ticket_numbers")
+  totalAmount   Int      @map("total_amount")
+  status        String
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
 
-  raffle Raffle? @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  raffle Raffle @relation(fields: [raffleId], references: [id])
+
+  @@map("reservations")
 }
 
 model Setting {
-  id           String @id
-  adminWhatsApp String?
-  bankInfo     String?
+  id            String  @id
+  adminWhatsApp String  @map("admin_whatsapp")
+  bankInfo      String  @map("bank_info")
+  systemName    String  @default("RifasPremium") @map("system_name")
+  aboutUs       String? @default("") @map("about_us")
+  address       String? @default("")
+  contactPhone  String? @default("") @map("contact_phone")
+  contactEmail  String? @default("") @map("contact_email")
+  facebookUrl   String? @default("") @map("facebook_url")
+  instagramUrl  String? @default("") @map("instagram_url")
+
+  @@map("settings")
 }
