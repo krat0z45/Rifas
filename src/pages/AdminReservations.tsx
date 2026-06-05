@@ -38,9 +38,28 @@ export default function AdminReservations() {
   const updateStatus = async (id: string, status: 'approved' | 'rejected') => {
     try {
       await api.updateReservationStatus(id, status);
+      
+      if (status === 'approved') {
+        const res = reservations.find(r => r.id === id);
+        if (res) {
+          const url = window.location.origin;
+          const boletosStr = res.ticketNumbers.map(n => n.toString().padStart(5, '0')).join(', ');
+          
+          const msg = encodeURIComponent(`Hola *${res.purchaserName}*!\n\n¡Tu pago ha sido validado y tus boletos están *APROBADOS*! ✅\n\nFolio: *${res.folio}*\nBoletos: ${boletosStr}\n\nPuedes consultar tu folio en cualquier momento desde nuestra página web:\n${url}\n\n¡Mucha suerte! 🍀`);
+          
+          let phone = res.phone.replace(/\D/g, '');
+          if (phone.length === 10) {
+              phone = '52' + phone;
+          }
+          
+          window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+        }
+      }
+
       fetchReservations();
     } catch (e) {
       console.error(e);
+      alert('Error al actualizar el estado del boleto.');
     }
   };
 

@@ -78,8 +78,10 @@ export default function AdminSettings() {
     try {
       await api.deleteUser(id.toString());
       setAdmins(admins.filter(a => a.id !== id));
-    } catch (error) {
+      alert('Administrador eliminado correctamente');
+    } catch (error: any) {
       console.error(error);
+      alert('Hubo un error al eliminar el administrador: ' + error.message);
     }
   };
 
@@ -141,10 +143,9 @@ export default function AdminSettings() {
                   <Label className="text-slate-400">Información Bancaria (Cuentas para Depósitos/Transferencias)</Label>
                   <Button 
                     type="button" 
-                    variant="outline" 
                     size="sm" 
                     onClick={() => append({ bankName: '', accountNumber: '', beneficiary: '' })}
-                    className="border-slate-700 text-slate-300 hover:text-white"
+                    className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition-colors"
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Agregar Cuenta
