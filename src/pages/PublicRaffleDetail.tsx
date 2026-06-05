@@ -140,7 +140,12 @@ export default function PublicRaffleDetail() {
         totalAmount: selectedTickets.length * raffle.ticketPrice,
       });
       
-      setPurchaseComplete({ folio, totalAmount: selectedTickets.length * raffle.ticketPrice });
+      setPurchaseComplete({ 
+        folio, 
+        totalAmount: selectedTickets.length * raffle.ticketPrice,
+        tickets: selectedTickets,
+        formData: formData 
+      });
       setIsCheckoutOpen(false);
     } catch (error) {
       console.error(error);
@@ -406,8 +411,32 @@ export default function PublicRaffleDetail() {
                   alert("WhatsApp de admin no configurado");
                   return;
                 }
-                const msg = encodeURIComponent(`Hola, acabo de apartar boletos.\nFolio: *${purchaseComplete.folio}*\nTengo mi comprobante de pago.`);
-                window.open(`https://wa.me/${settings.adminWhatsApp}?text=${msg}`, '_blank');
+                const fecha = new Intl.DateTimeFormat('es-MX', { dateStyle: 'long' }).format(new Date());
+                const boletosStr = purchaseComplete.tickets.map((t: number) => t.toString().padStart(5, '0')).join(', ');
+                
+                const template = `*${settings.systemName || 'SISTEMA DE RIFAS'}*
+
+Hola! Soy ${purchaseComplete.formData.name} de ${purchaseComplete.formData.city}, mi número de teléfono es ${purchaseComplete.formData.phone}
+
+No: ${purchaseComplete.folio}
+Apartado: ${fecha}
+Tiempo de apartado: 12 hrs
+Importe a Pagar: $${purchaseComplete.totalAmount.toFixed(2)}
+
+Boletos:
+${boletosStr}
+
+Enlace de la rifa:
+${window.location.href}
+
+❗❗IMPORTANTE❗❗
+
+Por favor envíanos tu comprobante pago vía WhatsApp 
+NO OLVIDES PONER TU NOMBRE COMPLETO EN CONCEPTO AL REALIZAR LA TRANSFERENCIA!! 🍀🍀`;
+
+                const msg = encodeURIComponent(template);
+                const waNumber = settings.adminWhatsApp.replace(/\D/g, '');
+                window.open(`https://wa.me/${waNumber}?text=${msg}`, '_blank');
               }}
             >
               <Send className="w-5 h-5" />

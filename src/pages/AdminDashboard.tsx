@@ -1,30 +1,50 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { Users, Ticket, DollarSign, Activity } from 'lucide-react';
+import { Users, Ticket, DollarSign, Activity, User } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
 
 const COLORS = ['#10b981', '#3b82f6', '#ef4444'];
 
 export default function AdminDashboard() {
   const [metrics, setMetrics] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
-    const fetchMetrics = async () => {
+    const fetchMetricsAndUser = async () => {
       try {
         const data = await api.getMetrics();
         setMetrics(data);
+        
+        try {
+          const userData = await api.getMe();
+          setCurrentUser(userData.user);
+        } catch (e) {
+          console.error('Error fetching user', e);
+        }
       } catch (error) {
         console.error(error);
       }
     };
-    fetchMetrics();
+    fetchMetricsAndUser();
   }, []);
 
   if (!metrics) return <div className="text-white p-8 text-center">Cargando métricas...</div>
 
   return (
     <div className="space-y-6">
-      <h2 className="text-3xl font-bold tracking-tight text-white mb-8">Dashboard General</h2>
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+        <h2 className="text-3xl font-bold tracking-tight text-white">Dashboard General</h2>
+        {currentUser && (
+          <div className="bg-slate-900 border border-slate-800 rounded-full px-4 py-2 flex items-center gap-2">
+            <div className="bg-emerald-500/20 p-1.5 rounded-full">
+              <User className="w-4 h-4 text-emerald-400" />
+            </div>
+            <span className="text-sm text-slate-300 font-medium">
+              Bienvenido, <span className="text-white font-bold">{currentUser.email}</span>
+            </span>
+          </div>
+        )}
+      </div>
       
       <div className="grid gap-6 md:grid-cols-4 whitespace-nowrap">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 relative overflow-hidden">

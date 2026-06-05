@@ -106,6 +106,17 @@ app.put('/api/raffles/:id', authenticateToken, asyncHandler(async (req, res) => 
   res.json(updated);
 }));
 
+app.delete('/api/raffles/:id', authenticateToken, asyncHandler(async (req, res) => {
+  // First delete associated reservations to avoid relation constraint errors
+  await prisma.reservation.deleteMany({
+    where: { raffleId: req.params.id }
+  });
+  await prisma.raffle.delete({
+    where: { id: req.params.id }
+  });
+  res.json({ success: true });
+}));
+
 // --- RESERVATIONS ---
 app.get('/api/reservations', authenticateToken, asyncHandler(async (req, res) => {
   const data = await prisma.reservation.findMany({ orderBy: { createdAt: 'desc' } });
@@ -212,10 +223,11 @@ app.get('/api/users', authenticateToken, asyncHandler(async (req, res) => {
 
 app.post('/api/users', authenticateToken, asyncHandler(async (req, res) => {
   const { email, password } = req.body;
+  const hashedPassword = await bcrypt.hash(password, 10);
   const newRef = await prisma.user.create({
     data: {
       email,
-      password,
+      password: hashedPassword,
     },
     select: { id: true, email: true }
   });

@@ -33,6 +33,7 @@ export const api = {
   getRaffleReservations: (id: string) => request(`/raffles/${id}/reservations`),
   createRaffle: (data: any) => request('/raffles', { method: 'POST', body: JSON.stringify(data) }),
   updateRaffle: (id: string, data: any) => request(`/raffles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteRaffle: (id: string) => request(`/raffles/${id}`, { method: 'DELETE' }),
   
   getReservations: () => request('/reservations'),
   createReservation: (data: any) => request('/reservations', { method: 'POST', body: JSON.stringify(data) }),

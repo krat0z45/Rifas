@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus } from 'lucide-react';
+import { Plus, Edit3, Trash2, Image as ImageIcon } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 
 interface Raffle {
@@ -24,7 +24,12 @@ interface Raffle {
 export default function AdminRaffles() {
   const [raffles, setRaffles] = useState<Raffle[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const { register, handleSubmit, reset } = useForm();
+  const [editingRaffle, setEditingRaffle] = useState<Raffle | null>(null);
+  const [imageBase64, setImageBase64] = useState<string>('');
+  const [raffleToDelete, setRaffleToDelete] = useState<string | null>(null);
+  
+  const { register, handleSubmit, reset, setValue } = useForm();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchRaffles = async () => {
     try {
@@ -39,18 +44,78 @@ export default function AdminRaffles() {
     fetchRaffles();
   }, []);
 
+  const openEditDialog = (raffle: Raffle) => {
+    setEditingRaffle(raffle);
+    setValue('title', raffle.title);
+    setValue('description', raffle.description);
+    setValue('instructions', raffle.instructions);
+    setValue('totalTickets', raffle.totalTickets);
+    setValue('ticketPrice', raffle.ticketPrice);
+    setImageBase64(raffle.prizeImageUrl);
+    setIsDialogOpen(true);
+  };
+
+  const openNewDialog = () => {
+    setEditingRaffle(null);
+    reset({
+      title: '', description: '', instructions: '', totalTickets: '', ticketPrice: ''
+    });
+    setImageBase64('');
+    setIsDialogOpen(true);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImageBase64(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const deleteRaffle = (id: string) => {
+    setRaffleToDelete(id);
+  };
+
+  const confirmDelete = async () => {
+    if (raffleToDelete) {
+      try {
+        await api.deleteRaffle(raffleToDelete);
+        setRaffleToDelete(null);
+        fetchRaffles();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  };
+
   const onSubmit = async (data: any) => {
     try {
-      await api.createRaffle({
+      if (!imageBase64) {
+        alert("Por favor selecciona una imagen o espera a que cargue.");
+        return;
+      }
+      const payload = {
         title: data.title,
         description: data.description,
         instructions: data.instructions,
-        prizeImageUrl: data.prizeImageUrl,
+        prizeImageUrl: imageBase64,
         totalTickets: parseInt(data.totalTickets),
         ticketPrice: parseFloat(data.ticketPrice),
-        status: 'active'
-      });
+        status: editingRaffle ? editingRaffle.status : 'active'
+      };
+
+      if (editingRaffle) {
+        await api.updateRaffle(editingRaffle.id, payload);
+      } else {
+        await api.createRaffle(payload);
+      }
+      
       reset();
+      setImageBase64('');
+      setEditingRaffle(null);
       setIsDialogOpen(false);
       fetchRaffles();
     } catch (e) {
@@ -74,13 +139,15 @@ export default function AdminRaffles() {
         <h2 className="text-3xl font-bold tracking-tight text-white">Rifas</h2>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <button className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center shadow-lg shadow-emerald-900/20 transition-all">
+            <button onClick={openNewDialog} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center shadow-lg shadow-emerald-900/20 transition-all">
               <Plus className="w-5 h-5 mr-2" /> Nueva Rifa
             </button>
           </DialogTrigger>
-          <DialogContent className="max-w-md bg-slate-900 text-slate-200 border-slate-800 font-sans">
+          <DialogContent className="max-w-md bg-slate-900 text-slate-200 border-slate-800 font-sans max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-xl font-bold text-white">Crear Nueva Rifa</DialogTitle>
+              <DialogTitle className="text-xl font-bold text-white">
+                {editingRaffle ? 'Editar Rifa' : 'Crear Nueva Rifa'}
+              </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
               <div className="space-y-2">
@@ -96,8 +163,27 @@ export default function AdminRaffles() {
                 <textarea required rows={4} {...register("instructions")} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none resize-none" />
               </div>
               <div className="space-y-2">
-                <Label className="text-slate-400">URL Imagen del Premio</Label>
-                <input required {...register("prizeImageUrl")} type="url" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none" />
+                <Label className="text-slate-400">Imagen del Premio</Label>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleFileChange}
+                  ref={fileInputRef}
+                  className="hidden" 
+                />
+                <div 
+                  className="w-full h-32 bg-slate-950 border-2 border-dashed border-slate-800 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-slate-600 transition-colors relative overflow-hidden"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {imageBase64 ? (
+                    <img src={imageBase64} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
+                  ) : (
+                    <>
+                      <ImageIcon className="w-8 h-8 text-slate-600 mb-2" />
+                      <span className="text-sm text-slate-500">Seleccionar imagen</span>
+                    </>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -110,20 +196,49 @@ export default function AdminRaffles() {
                 </div>
               </div>
               <button type="submit" className="w-full py-4 mt-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-900/20">
-                Publicar Rifa
+                {editingRaffle ? 'Guardar Cambios' : 'Publicar Rifa'}
               </button>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
+      <Dialog open={!!raffleToDelete} onOpenChange={(open) => !open && setRaffleToDelete(null)}>
+        <DialogContent className="max-w-md bg-slate-900 border-slate-800 text-slate-200 font-sans">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-white">¿Eliminar Rifa?</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-slate-400">
+            Estás a punto de eliminar esta rifa. Esta acción también eliminará todos los boletos reservados para la misma y no se puede deshacer. ¿Deseas continuar?
+          </div>
+          <div className="flex gap-4 justify-end mt-4">
+            <button onClick={() => setRaffleToDelete(null)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-white font-medium transition-colors">
+              Cancelar
+            </button>
+            <button onClick={confirmDelete} className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white font-bold transition-colors shadow-lg shadow-red-900/20">
+              Eliminar Definitivamente
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {raffles.map(raffle => (
-          <div key={raffle.id} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl shadow-black/20 flex flex-col">
+          <div key={raffle.id} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl shadow-black/20 flex flex-col group relative">
+            
+            <div className="absolute top-4 right-4 z-10 flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+              <button onClick={() => openEditDialog(raffle)} className="bg-blue-600/90 hover:bg-blue-500 p-2 rounded-lg text-white shadow-lg backdrop-blur-sm transition-colors">
+                <Edit3 className="w-4 h-4" />
+              </button>
+              <button onClick={() => deleteRaffle(raffle.id)} className="bg-red-600/90 hover:bg-red-500 p-2 rounded-lg text-white shadow-lg backdrop-blur-sm transition-colors">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+
             <div className="h-48 w-full bg-slate-800 relative">
               <img src={raffle.prizeImageUrl} alt={raffle.title} className="w-full h-full object-cover opacity-80" />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent" />
-              <div className={`absolute top-4 right-4 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider ${raffle.status === 'active' ? 'bg-emerald-500 text-slate-950' : 'bg-slate-700 text-slate-300'}`}>
+              <div className={`absolute top-4 left-4 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider ${raffle.status === 'active' ? 'bg-emerald-500 text-slate-950' : 'bg-slate-700 text-slate-300'}`}>
                 {raffle.status === 'active' ? 'Activa' : 'Pausada'}
               </div>
             </div>
