@@ -17,7 +17,7 @@ export default function PublicRaffleDetail() {
   const [pendingTickets, setPendingTickets] = useState<Set<number>>(new Set());
   
   const [selectedTickets, setSelectedTickets] = useState<number[]>([]);
-  const [randomCount, setRandomCount] = useState(1);
+  const [randomCount, setRandomCount] = useState<number | ''>(1);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   
   const [formData, setFormData] = useState({ name: '', phone: '', city: '' });
@@ -79,23 +79,39 @@ export default function PublicRaffleDetail() {
 
   const [randomizingOverlay, setRandomizingOverlay] = useState<{ active: boolean, currentNumber: string }>({ active: false, currentNumber: '000' });
 
+  const [randomError, setRandomError] = useState('');
+
   const selectRandom = async () => {
     if (!raffle) return;
+    
+    const countToPick = typeof randomCount === 'number' ? randomCount : 0;
+    if (countToPick <= 0) {
+      setRandomError("Solo puedes apartar boletos a partir de 1 boleto.");
+      return;
+    }
+
     let available: number[] = [];
     for (let i = 1; i <= raffle.totalTickets; i++) {
         if (!approvedTickets.has(i) && !pendingTickets.has(i) && !selectedTickets.includes(i)) available.push(i);
     }
     
+    if (countToPick > available.length) {
+      setRandomError(`Actualmente solo hay ${available.length} boletos disponibles. Por favor ingresa una cantidad menor o igual.`);
+      return;
+    }
+
+    setRandomError('');
+
     // Fisher-Yates shuffle
     for(let i = available.length - 1; i > 0; i--){
       const j = Math.floor(Math.random() * (i + 1));
       [available[i], available[j]] = [available[j], available[i]];
     }
     
-    const count = Math.min(randomCount, available.length);
+    const count = Math.min(countToPick, available.length);
     const chosen = available.slice(0, count);
     if(chosen.length === 0) {
-      alert("No hay suficientes números disponibles.");
+      setRandomError("No hay suficientes números disponibles.");
       return;
     }
 
@@ -240,27 +256,41 @@ export default function PublicRaffleDetail() {
               </div>
             </div>
             
-            <div className="mt-6 p-4 bg-blue-900/20 rounded-xl border border-blue-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="mt-6 p-4 bg-blue-900/20 rounded-xl border border-blue-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative">
               <div>
                 <div className="text-xs text-blue-400 font-bold uppercase mb-1">Modo Automático</div>
                 <p className="text-[11px] text-slate-400">Genera números al azar.</p>
               </div>
-              <div className="flex space-x-2">
-                <Input 
-                  type="number" 
-                  min={1} 
-                  max={100}
-                  value={randomCount} 
-                  onChange={e => setRandomCount(parseInt(e.target.value) || 1)}
-                  className="bg-slate-950 border-slate-700 w-20 text-center focus:ring-1 focus:ring-blue-500"
-                />
-                <button 
-                  onClick={selectRandom} 
-                  disabled={randomizingOverlay.active}
-                  className="px-6 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg font-bold text-sm transition-colors flex items-center"
-                >
-                  <Shuffle className="w-4 h-4 mr-2" /> Azar
-                </button>
+              <div className="flex flex-col items-end space-y-2">
+                <div className="flex space-x-2">
+                  <Input 
+                    type="number" 
+                    min={0} 
+                    value={randomCount} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === '') {
+                        setRandomCount('');
+                      } else {
+                        setRandomCount(parseInt(val, 10));
+                      }
+                      setRandomError('');
+                    }}
+                    className="bg-slate-950 border-slate-700 w-24 text-center focus:ring-1 focus:ring-blue-500"
+                  />
+                  <button 
+                    onClick={selectRandom} 
+                    disabled={randomizingOverlay.active}
+                    className="px-6 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg font-bold text-sm transition-colors flex items-center"
+                  >
+                    <Shuffle className="w-4 h-4 mr-2" /> Azar
+                  </button>
+                </div>
+                {randomError && (
+                  <div className="text-red-400 text-xs text-right max-w-[200px] leading-tight">
+                    {randomError}
+                  </div>
+                )}
               </div>
             </div>
           </div>
