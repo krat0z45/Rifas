@@ -5,7 +5,7 @@ import { Ticket, ArrowRight, Car, Search, CheckCircle2, Clock, XCircle, Download
 import { motion } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import PublicNavbar from '../components/PublicNavbar';
 
 export default function PublicLanding() {
@@ -255,14 +255,96 @@ export default function PublicLanding() {
 
                 <div className="mt-4 flex justify-center pb-2">
                   <button 
-                    onClick={async () => {
-                      if (ticketRef.current) {
-                        const canvas = await html2canvas(ticketRef.current, { backgroundColor: '#020617', scale: 2 });
-                        const url = canvas.toDataURL('image/png');
-                        const link = document.createElement('a');
-                        link.download = `Ticket-Folio-${searchResult.folio}.png`;
-                        link.href = url;
-                        link.click();
+                    onClick={() => {
+                      try {
+                        const doc = new jsPDF();
+                        const pageWidth = doc.internal.pageSize.getWidth();
+
+                        // Background
+                        doc.setFillColor(15, 23, 42); // slate-900
+                        doc.rect(0, 0, 210, 297, "F");
+
+                        // Header Header
+                        doc.setFillColor(16, 185, 129); // emerald-500
+                        doc.rect(0, 0, 210, 35, "F");
+
+                        doc.setTextColor(255, 255, 255);
+                        doc.setFontSize(24);
+                        doc.setFont("helvetica", "bold");
+                        doc.text("¡Pago Confirmado!", pageWidth / 2, 22, { align: "center" });
+
+                        // Customer Info Box
+                        doc.setFillColor(30, 41, 59); // slate-800
+                        doc.roundedRect(20, 45, 170, 45, 5, 5, "F");
+
+                        doc.setFontSize(12);
+                        doc.setFont("helvetica", "normal");
+                        doc.setTextColor(148, 163, 184); // slate-400
+                        doc.text("Participante:", 25, 58);
+                        doc.text("Rifa:", 25, 68);
+                        doc.text("Folio Oficial:", 25, 78);
+
+                        doc.setTextColor(255, 255, 255);
+                        doc.setFont("helvetica", "bold");
+                        doc.text(searchResult.purchaserName, 70, 58);
+                        doc.text(searchResult.raffleTitle, 70, 68);
+                        doc.setTextColor(96, 165, 250); // blue-400
+                        doc.text(searchResult.folio, 70, 78);
+
+                        // Amount 
+                        doc.setFillColor(2, 6, 23); // slate-950
+                        doc.roundedRect(130, 52, 50, 30, 3, 3, "F");
+                        doc.setTextColor(148, 163, 184); // slate-400
+                        doc.setFontSize(10);
+                        doc.setFont("helvetica", "normal");
+                        doc.text("Total Pagado", 155, 62, { align: "center" });
+                        doc.setTextColor(52, 211, 153); // emerald-400
+                        doc.setFontSize(16);
+                        doc.setFont("helvetica", "bold");
+                        doc.text(`$${searchResult.totalAmount.toFixed(2)}`, 155, 74, { align: "center" });
+
+                        // Tickets
+                        const startY = 105;
+                        doc.setTextColor(255, 255, 255);
+                        doc.setFontSize(16);
+                        doc.text("Tus Números de la Suerte", pageWidth / 2, startY, { align: "center" });
+
+                        doc.setFontSize(10);
+                        doc.setFont("courier", "bold"); 
+                        const sortedTickets = [...searchResult.ticketNumbers].sort((a,b)=>a-b);
+                        
+                        let tX = 20;
+                        let tY = startY + 15;
+                        const tWidth = 14;
+                        const tHeight = 8;
+                        const padding = 3;
+
+                        sortedTickets.forEach((t) => {
+                          if (tX + tWidth > 190) {
+                            tX = 20;
+                            tY += tHeight + padding;
+                          }
+                          
+                          if (tY > 280) {
+                            doc.addPage();
+                            doc.setFillColor(15, 23, 42); 
+                            doc.rect(0, 0, 210, 297, "F");
+                            tY = 20;
+                          }
+
+                          doc.setFillColor(59, 130, 246); // bg-blue-500
+                          doc.roundedRect(tX, tY, tWidth, tHeight, 1.5, 1.5, "F");
+                          
+                          doc.setTextColor(255,255,255);
+                          doc.text(t.toString().padStart(3, '0'), tX + (tWidth/2), tY + 5.5, { align: "center" });
+                          
+                          tX += tWidth + padding;
+                        });
+
+                        doc.save(`Ticket-Folio-${searchResult.folio}.pdf`);
+                      } catch (e) {
+                        console.error("Error generating PDF ticket:", e);
+                        setSearchError("Ocurrió un error al generar el PDF de tu ticket.");
                       }
                     }}
                     className="flex items-center space-x-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2 px-6 rounded-xl transition-colors shadow-lg"
