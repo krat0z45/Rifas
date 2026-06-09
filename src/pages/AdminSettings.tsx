@@ -5,8 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useForm, useFieldArray } from 'react-hook-form';
-import { Trash, Plus } from 'lucide-react';
+import { Trash, Plus, AlertCircle, Edit } from 'lucide-react';
 
 export default function AdminSettings() {
   const { register, handleSubmit, reset, control } = useForm();
@@ -16,9 +17,17 @@ export default function AdminSettings() {
   });
   const [loading, setLoading] = useState(true);
   const [admins, setAdmins] = useState<any[]>([]);
+  const [newAdminName, setNewAdminName] = useState('');
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [newAdminPassword, setNewAdminPassword] = useState('');
   const [activeTab, setActiveTab] = useState<'general' | 'about' | 'admins'>('general');
+  const [adminToDelete, setAdminToDelete] = useState<{id: number, email: string} | null>(null);
+  const [deleteError, setDeleteError] = useState('');
+  const [adminToEdit, setAdminToEdit] = useState<{id: number, name: string, email: string} | null>(null);
+  const [editAdminName, setEditAdminName] = useState('');
+  const [editAdminEmail, setEditAdminEmail] = useState('');
+  const [editAdminPassword, setEditAdminPassword] = useState('');
+  const [editError, setEditError] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -61,10 +70,11 @@ export default function AdminSettings() {
 
   const handleCreateAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAdminEmail || !newAdminPassword) return;
+    if (!newAdminName || !newAdminEmail || !newAdminPassword) return;
     try {
-      const newAdmin = await api.createUser({ email: newAdminEmail, password: newAdminPassword });
+      const newAdmin = await api.createUser({ name: newAdminName, email: newAdminEmail, password: newAdminPassword });
       setAdmins([...admins, newAdmin]);
+      setNewAdminName('');
       setNewAdminEmail('');
       setNewAdminPassword('');
     } catch (error) {
@@ -73,15 +83,50 @@ export default function AdminSettings() {
     }
   };
 
-  const handleDeleteAdmin = async (id: number) => {
-    if(!confirm("¿Estás seguro de eliminar esta cuenta de administrador?")) return;
+  const handleDeleteAdminClick = (admin: any) => {
+    if (admins.length <= 1) {
+      alert("No puedes eliminar la cuenta de administrador. Debe existir al menos 1 cuenta.");
+      return;
+    }
+    setAdminToDelete({ id: admin.id, email: admin.email });
+    setDeleteError('');
+  };
+
+  const confirmDeleteAdmin = async () => {
+    if (!adminToDelete) return;
     try {
-      await api.deleteUser(id.toString());
-      setAdmins(admins.filter(a => a.id !== id));
-      alert('Administrador eliminado correctamente');
+      await api.deleteUser(adminToDelete.id.toString());
+      setAdmins(admins.filter(a => a.id !== adminToDelete.id));
+      setAdminToDelete(null);
     } catch (error: any) {
       console.error(error);
-      alert('Hubo un error al eliminar el administrador: ' + error.message);
+      setDeleteError(error.message || 'Hubo un error al eliminar el administrador.');
+    }
+  };
+
+  const handleEditAdminClick = (admin: any) => {
+    setAdminToEdit({ id: admin.id, name: admin.name || '', email: admin.email });
+    setEditAdminName(admin.name || '');
+    setEditAdminEmail(admin.email);
+    setEditAdminPassword('');
+    setEditError('');
+  };
+
+  const confirmEditAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminToEdit) return;
+    if (!editAdminName || !editAdminEmail) return;
+    try {
+      const updateData: any = { name: editAdminName, email: editAdminEmail };
+      if (editAdminPassword) {
+        updateData.password = editAdminPassword;
+      }
+      const updatedAdmin = await api.updateUser(adminToEdit.id.toString(), updateData);
+      setAdmins(admins.map(a => a.id === updatedAdmin.id ? updatedAdmin : a));
+      setAdminToEdit(null);
+    } catch (error: any) {
+      console.error(error);
+      setEditError(error.message || 'Hubo un error al editar el administrador.');
     }
   };
 
@@ -283,6 +328,17 @@ export default function AdminSettings() {
             <form onSubmit={handleCreateAdmin} className="space-y-4 bg-slate-950 p-6 rounded-xl border border-slate-800 md:max-w-md">
               <h4 className="text-base font-bold text-slate-300">Añadir Nuevo Administrador</h4>
               <div className="space-y-2">
+                <Label className="text-slate-400">Nombre y Apellido</Label>
+                <input 
+                  type="text"
+                  required
+                  value={newAdminName}
+                  onChange={e => setNewAdminName(e.target.value)}
+                  placeholder="Ej. Juan Pérez" 
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-3 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none text-slate-200" 
+                />
+              </div>
+              <div className="space-y-2">
                 <Label className="text-slate-400">Correo Electrónico</Label>
                 <input 
                   type="email"
@@ -315,14 +371,26 @@ export default function AdminSettings() {
             <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Lista de Administradores</h4>
             {admins.map((admin) => (
               <div key={admin.id} className="flex justify-between items-center p-4 bg-slate-950 border border-slate-800 rounded-xl">
-                <div className="text-base font-medium text-slate-200">{admin.email}</div>
-                <button 
-                  onClick={() => handleDeleteAdmin(admin.id)}
-                  className="text-slate-500 hover:text-red-400 transition-colors p-2"
-                  title="Eliminar cuenta"
-                >
-                  <Trash className="w-5 h-5" />
-                </button>
+                <div>
+                  <div className="text-base font-bold text-slate-200">{admin.name || 'Administrador'}</div>
+                  <div className="text-sm text-slate-500">{admin.email}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => handleEditAdminClick(admin)}
+                    className="text-slate-500 hover:text-blue-400 transition-colors p-2"
+                    title="Editar cuenta"
+                  >
+                    <Edit className="w-5 h-5" />
+                  </button>
+                  <button 
+                    onClick={() => handleDeleteAdminClick(admin)}
+                    className="text-slate-500 hover:text-red-400 transition-colors p-2"
+                    title="Eliminar cuenta"
+                  >
+                    <Trash className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             ))}
             {admins.length === 0 && (
@@ -331,6 +399,109 @@ export default function AdminSettings() {
           </div>
         </div>
       </div>
+
+      <Dialog open={!!adminToDelete} onOpenChange={(open) => !open && setAdminToDelete(null)}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-white sm:max-w-[425px]">
+          <DialogHeader>
+            <div className="mx-auto w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+              <AlertCircle className="w-6 h-6 text-red-500" />
+            </div>
+            <DialogTitle className="text-center text-xl">Eliminar Administrador</DialogTitle>
+          </DialogHeader>
+          <div className="text-center py-4">
+            <p className="text-slate-300">
+              ¿Estás seguro que deseas eliminar la cuenta de administrador <span className="font-bold text-white">{adminToDelete?.email}</span>?
+            </p>
+            <p className="text-slate-500 text-sm mt-2">Esta acción no se puede deshacer.</p>
+            {deleteError && (
+              <div className="mt-4 p-3 bg-red-500/10 text-red-400 text-sm rounded-lg">
+                {deleteError}
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex gap-2 sm:justify-center">
+            <Button 
+              variant="outline" 
+              onClick={() => setAdminToDelete(null)}
+              className="bg-transparent border-slate-700 text-slate-300 hover:bg-slate-800"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmDeleteAdmin}
+              className="bg-red-600 hover:bg-red-500 text-white"
+            >
+              Eliminar Definitivamente
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={!!adminToEdit} onOpenChange={(open) => !open && setAdminToEdit(null)}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-white sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Editar Administrador</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={confirmEditAdmin} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-slate-400">Nombre y Apellido</Label>
+              <input 
+                type="text"
+                required
+                value={editAdminName}
+                onChange={e => setEditAdminName(e.target.value)}
+                placeholder="Ej. Juan Pérez" 
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none text-slate-200" 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-slate-400">Correo Electrónico</Label>
+              <input 
+                type="email"
+                required
+                value={editAdminEmail}
+                onChange={e => setEditAdminEmail(e.target.value)}
+                placeholder="correo@ejemplo.com" 
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none text-slate-200" 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-slate-400">Nueva Contraseña (Opcional)</Label>
+              <input 
+                type="password"
+                value={editAdminPassword}
+                onChange={e => setEditAdminPassword(e.target.value)}
+                placeholder="Dejar en blanco para mantener la actual" 
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none text-slate-200" 
+              />
+            </div>
+            
+            {editError && (
+              <div className="p-3 bg-red-500/10 text-red-400 text-sm rounded-lg">
+                {editError}
+              </div>
+            )}
+            
+            <DialogFooter className="pt-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setAdminToEdit(null)}
+                className="bg-transparent border-slate-700 text-slate-300 hover:bg-slate-800"
+              >
+                Cancelar
+              </Button>
+              <Button 
+                type="submit" 
+                className="bg-blue-600 hover:bg-blue-500 text-white"
+              >
+                Guardar Cambios
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

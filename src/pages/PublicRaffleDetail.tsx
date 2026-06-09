@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ChevronLeft, Ticket, Shuffle, Send, Building, Check, Copy } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Ticket, Shuffle, Send, Building, Check, Copy } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PublicNavbar from '../components/PublicNavbar';
 
@@ -22,6 +22,22 @@ export default function PublicRaffleDetail() {
   
   const [formData, setFormData] = useState({ name: '', phone: '', city: '' });
   const [purchaseComplete, setPurchaseComplete] = useState<any>(null);
+
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  const parsedImages = useMemo(() => {
+    if (!raffle) return [];
+    let imgs: string[] = [];
+    if (raffle.images) {
+      try {
+        imgs = JSON.parse(raffle.images);
+      } catch(e) {}
+    }
+    if (imgs.length === 0 && raffle.prizeImageUrl) {
+      imgs = [raffle.prizeImageUrl];
+    }
+    return imgs;
+  }, [raffle]);
 
   useEffect(() => {
     const init = async () => {
@@ -216,7 +232,7 @@ export default function PublicRaffleDetail() {
         <div>
           <div className="mb-8">
             <h1 className="text-4xl font-black italic mb-4 text-white">{raffle.title}</h1>
-            <p className="text-slate-400">{raffle.description}</p>
+            <p className="text-slate-400 whitespace-pre-line leading-relaxed">{raffle.description}</p>
           </div>
 
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 mb-8">
@@ -299,7 +315,7 @@ export default function PublicRaffleDetail() {
         {/* Right Side: Info & Checkout */}
         <div className="space-y-6">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden sticky top-24 flex flex-col">
-            <header className="h-48 relative overflow-hidden flex-shrink-0">
+            <header className="h-48 relative overflow-hidden flex-shrink-0 group">
               <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent z-10" />
               <div className="absolute top-4 left-4 z-20">
                 <span className="bg-emerald-500 text-slate-950 text-[10px] font-bold px-2 py-1 rounded uppercase mr-2">En Curso</span>
@@ -308,9 +324,44 @@ export default function PublicRaffleDetail() {
                 <div className="text-[10px] text-slate-400 uppercase tracking-widest">Costo por número</div>
                 <div className="text-xl font-bold text-white">${raffle.ticketPrice.toFixed(2)}</div>
               </div>
+              
               <div className="absolute inset-0 bg-slate-800">
-                <img src={raffle.prizeImageUrl} alt="Premio" className="w-full h-full object-cover opacity-60" />
+                <img 
+                  src={parsedImages[currentImageIndex]} 
+                  alt={`Premio ${currentImageIndex + 1}`} 
+                  className="w-full h-full object-cover opacity-60 transition-all duration-500" 
+                  key={currentImageIndex}
+                />
               </div>
+
+              {parsedImages.length > 1 && (
+                <>
+                  <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 flex justify-between z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      onClick={() => setCurrentImageIndex(prev => prev === 0 ? parsedImages.length - 1 : prev - 1)}
+                      className="bg-black/50 hover:bg-black/80 text-white p-1.5 rounded-full backdrop-blur-md transition-colors"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <button 
+                      onClick={() => setCurrentImageIndex(prev => prev === parsedImages.length - 1 ? 0 : prev + 1)}
+                      className="bg-black/50 hover:bg-black/80 text-white p-1.5 rounded-full backdrop-blur-md transition-colors"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5 z-20">
+                    {parsedImages.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setCurrentImageIndex(idx)}
+                        className={`w-1.5 h-1.5 rounded-full transition-all ${idx === currentImageIndex ? 'bg-white w-4' : 'bg-white/50 hover:bg-white/80'}`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
             </header>
             
             <div className="p-6 flex flex-col">
@@ -446,23 +497,22 @@ export default function PublicRaffleDetail() {
                 
                 const template = `*${settings.systemName || 'SISTEMA DE RIFAS'}*
 
-Hola! Soy ${purchaseComplete.formData.name} de ${purchaseComplete.formData.city}, mi número de teléfono es ${purchaseComplete.formData.phone}
+Hola! Soy *${purchaseComplete.formData.name}* de *${purchaseComplete.formData.city}*, mi número de teléfono es *${purchaseComplete.formData.phone}*
 
-No: ${purchaseComplete.folio}
-Apartado: ${fecha}
-Tiempo de apartado: 12 hrs
-Importe a Pagar: $${purchaseComplete.totalAmount.toFixed(2)}
+🎟️ *Rifa:* ${raffle.title}
+🎫 *Boletos:* ${boletosStr}
 
-Boletos:
-${boletosStr}
+💰 *Importe a Pagar:* $${purchaseComplete.totalAmount.toFixed(2)}
+🔢 *No. de Folio:* ${purchaseComplete.folio}
+⏱️ *Apartado:* ${fecha}
+⏰ *Tiempo límite:* 12 hrs
 
-Enlace de la rifa:
+🔗 *Enlace de la rifa:*
 ${window.location.href}
 
-❗❗IMPORTANTE❗❗
-
-Por favor envíanos tu comprobante pago vía WhatsApp 
-NO OLVIDES PONER TU NOMBRE COMPLETO EN CONCEPTO AL REALIZAR LA TRANSFERENCIA!! 🍀🍀`;
+❗❗ *IMPORTANTE* ❗❗
+Por favor envíanos tu comprobante de pago vía WhatsApp.
+¡NO OLVIDES MENCIONAR TU NOMBRE COMPLETO AL REALIZAR LA TRANSFERENCIA! 🍀🍀`;
 
                 const msg = encodeURIComponent(template);
                 const waNumber = settings.adminWhatsApp.replace(/\D/g, '');

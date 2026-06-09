@@ -41,7 +41,7 @@ const asyncHandler = (fn: express.RequestHandler) => (req: express.Request, res:
 
 // --- AUTH ROUTES ---
 app.post('/api/auth/register', asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+  const { name, email, password } = req.body;
   const existingUser = await prisma.user.findUnique({ where: { email } });
   if (existingUser) {
     return res.status(400).json({ error: 'User already exists' });
@@ -49,11 +49,11 @@ app.post('/api/auth/register', asyncHandler(async (req, res) => {
 
   const hashedPassword = await bcrypt.hash(password, 10);
   const newUser = await prisma.user.create({
-    data: { email, password: hashedPassword }
+    data: { name: name || 'Administrador', email, password: hashedPassword }
   });
 
-  const token = jwt.sign({ id: newUser.id, email: newUser.email }, JWT_SECRET, { expiresIn: '7d' });
-  res.json({ token, user: { id: newUser.id, email: newUser.email } });
+  const token = jwt.sign({ id: newUser.id, name: newUser.name, email: newUser.email }, JWT_SECRET, { expiresIn: '7d' });
+  res.json({ token, user: { id: newUser.id, name: newUser.name, email: newUser.email } });
 }));
 
 app.post('/api/auth/login', asyncHandler(async (req, res) => {
@@ -64,13 +64,19 @@ app.post('/api/auth/login', asyncHandler(async (req, res) => {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
-  const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-  res.json({ token, user: { id: user.id, email: user.email } });
+  const token = jwt.sign({ id: user.id, name: user.name, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+  res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
 }));
 
-app.get('/api/auth/me', authenticateToken, (req, res) => {
-  res.json({ user: (req as any).user });
-});
+app.get('/api/auth/me', authenticateToken, asyncHandler(async (req, res) => {
+  const userId = (req as any).user.id;
+  const dbUser = await prisma.user.findUnique({ where: { id: userId } });
+  if (dbUser) {
+    res.json({ user: { id: dbUser.id, name: dbUser.name, email: dbUser.email } });
+  } else {
+    res.json({ user: (req as any).user });
+  }
+}));
 
 // --- RAFFLES ---
 app.get('/api/raffles', asyncHandler(async (req, res) => {
@@ -217,21 +223,39 @@ app.put('/api/settings', authenticateToken, asyncHandler(async (req, res) => {
 
 // --- USERS ---
 app.get('/api/users', authenticateToken, asyncHandler(async (req, res) => {
-  const data = await prisma.user.findMany({ select: { id: true, email: true, createdAt: true } });
+  const data = await prisma.user.findMany({ select: { id: true, name: true, email: true, createdAt: true } });
   res.json(data);
 }));
 
 app.post('/api/users', authenticateToken, asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+  const { name, email, password } = req.body;
   const hashedPassword = await bcrypt.hash(password, 10);
   const newRef = await prisma.user.create({
     data: {
+      name: name || 'Administrador',
       email,
       password: hashedPassword,
     },
-    select: { id: true, email: true }
+    select: { id: true, name: true, email: true }
   });
   res.json(newRef);
+}));
+
+app.put('/api/users/:id', authenticateToken, asyncHandler(async (req, res) => {
+  const { name, email, password } = req.body;
+  const updateData: any = { name, email };
+  
+  if (password) {
+    updateData.password = await bcrypt.hash(password, 10);
+  }
+
+  const updated = await prisma.user.update({
+    where: { id: parseInt(req.params.id) },
+    data: updateData,
+    select: { id: true, name: true, email: true }
+  });
+  
+  res.json(updated);
 }));
 
 app.delete('/api/users/:id', authenticateToken, asyncHandler(async (req, res) => {

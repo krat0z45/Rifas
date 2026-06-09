@@ -8,6 +8,7 @@ datasource db {
 
 model User {
   id        Int      @id @default(autoincrement())
+  name      String   @default("Administrador")
   email     String   @unique
   password  String
   createdAt DateTime @default(now()) @map("created_at")
