@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -20,7 +21,7 @@ export default function LoginPage() {
         setToken(token);
         window.location.href = '/admin';
       } else {
-        const { token } = await api.register({ email, password });
+        const { token } = await api.register({ name, email, password });
         setToken(token);
         window.location.href = '/admin';
       }
@@ -45,6 +46,16 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-3">
+              {!isLogin && (
+                <input 
+                  type="text" 
+                  required 
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Nombre y Apellido" 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none text-slate-200"
+                />
+              )}
               <input 
                 type="email" 
                 required 

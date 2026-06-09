@@ -45,6 +45,7 @@ export const api = {
   
   getUsers: () => request('/users'),
   createUser: (data: any) => request('/users', { method: 'POST', body: JSON.stringify(data) }),
+  updateUser: (id: string, data: any) => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteUser: (id: string) => request(`/users/${id}`, { method: 'DELETE' }),
   
   getMetrics: () => request('/metrics')

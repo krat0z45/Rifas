@@ -40,7 +40,7 @@ export default function AdminDashboard() {
               <User className="w-4 h-4 text-emerald-400" />
             </div>
             <span className="text-sm text-slate-300 font-medium">
-              Bienvenido, <span className="text-white font-bold">{currentUser.email}</span>
+              Bienvenido, <span className="text-white font-bold">{currentUser.name || currentUser.email}</span>
             </span>
           </div>
         )}
