@@ -8,12 +8,14 @@ const COLORS = ['#10b981', '#3b82f6', '#ef4444'];
 export default function AdminDashboard() {
   const [metrics, setMetrics] = useState<any>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [raffles, setRaffles] = useState<any[]>([]);
+  const [selectedRaffleId, setSelectedRaffleId] = useState<string>('');
 
   useEffect(() => {
-    const fetchMetricsAndUser = async () => {
+    const fetchInitialData = async () => {
       try {
-        const data = await api.getMetrics();
-        setMetrics(data);
+        const rafflesData = await api.getRaffles();
+        setRaffles(rafflesData);
         
         try {
           const userData = await api.getMe();
@@ -25,15 +27,39 @@ export default function AdminDashboard() {
         console.error(error);
       }
     };
-    fetchMetricsAndUser();
+    fetchInitialData();
   }, []);
+
+  useEffect(() => {
+    const fetchMetrics = async () => {
+      try {
+        const data = await api.getMetrics(selectedRaffleId || undefined);
+        setMetrics(data);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    fetchMetrics();
+  }, [selectedRaffleId]);
 
   if (!metrics) return <div className="text-white p-8 text-center">Cargando métricas...</div>
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-        <h2 className="text-3xl font-bold tracking-tight text-white">Dashboard General</h2>
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight text-white mb-4">Dashboard General</h2>
+          <select 
+            value={selectedRaffleId}
+            onChange={(e) => setSelectedRaffleId(e.target.value)}
+            className="bg-slate-900 border border-slate-800 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          >
+            <option value="">Todas las Rifas (Global)</option>
+            {raffles.map(r => (
+              <option key={r.id} value={r.id}>{r.title}</option>
+            ))}
+          </select>
+        </div>
         {currentUser && (
           <div className="bg-slate-900 border border-slate-800 rounded-full px-4 py-2 flex items-center gap-2">
             <div className="bg-emerald-500/20 p-1.5 rounded-full">

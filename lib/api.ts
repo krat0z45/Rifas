@@ -48,5 +48,5 @@ export const api = {
   updateUser: (id: string, data: any) => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteUser: (id: string) => request(`/users/${id}`, { method: 'DELETE' }),
   
-  getMetrics: () => request('/metrics')
+  getMetrics: (raffleId?: string) => request(raffleId ? `/metrics?raffleId=${raffleId}` : '/metrics')
 };

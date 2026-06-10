@@ -44,8 +44,9 @@ export default function AdminReservations() {
         if (res) {
           const url = window.location.origin;
           const boletosStr = res.ticketNumbers.map(n => n.toString().padStart(5, '0')).join(', ');
+          const raffleTitle = res.raffle ? res.raffle.title : 'Rifa';
           
-          const msg = encodeURIComponent(`Hola *${res.purchaserName}*!\n\n¡Tu pago ha sido validado y tus boletos están *APROBADOS*! ✅\n\nFolio: *${res.folio}*\nBoletos: ${boletosStr}\n\nPuedes consultar tu folio en cualquier momento desde nuestra página web:\n${url}\n\n¡Mucha suerte! 🍀`);
+          const msg = encodeURIComponent(`Hola *${res.purchaserName}*!\n\n¡Tu pago ha sido validado y tus boletos están *APROBADOS*! ✅\n\n🎟️ *Rifa:* ${raffleTitle}\n🔢 *Folio:* ${res.folio}\n🎫 *Boletos:* ${boletosStr}\n\nPuedes consultar tu folio en cualquier momento desde nuestra página web:\n${url}\n\n¡Mucha suerte! 🍀`);
           
           let phone = res.phone.replace(/\D/g, '');
           if (phone.length === 10) {
