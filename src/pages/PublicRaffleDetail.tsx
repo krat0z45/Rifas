@@ -508,7 +508,7 @@ Hola! Soy *${purchaseComplete.formData.name}* de *${purchaseComplete.formData.ci
 ⏰ *Tiempo límite:* 12 hrs
 
 🔗 *Enlace de la rifa:*
-${window.location.href}
+https://www.rifasrojo.com${window.location.pathname}
 
 ❗❗ *IMPORTANTE* ❗❗
 Por favor envíanos tu comprobante de pago vía WhatsApp.
