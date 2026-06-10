@@ -42,7 +42,7 @@ export default function AdminReservations() {
       if (status === 'approved') {
         const res = reservations.find(r => r.id === id);
         if (res) {
-          const url = window.location.origin;
+          const url = 'https://www.rifasrojo.com';
           const boletosStr = res.ticketNumbers.map(n => n.toString().padStart(5, '0')).join(', ');
           const raffleTitle = res.raffle ? res.raffle.title : 'Rifa';
           
