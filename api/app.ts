@@ -125,7 +125,10 @@ app.delete('/api/raffles/:id', authenticateToken, asyncHandler(async (req, res) 
 
 // --- RESERVATIONS ---
 app.get('/api/reservations', authenticateToken, asyncHandler(async (req, res) => {
-  const data = await prisma.reservation.findMany({ orderBy: { createdAt: 'desc' } });
+  const data = await prisma.reservation.findMany({ 
+    orderBy: { createdAt: 'desc' },
+    include: { raffle: true }
+  });
   res.json(data);
 }));
 
@@ -174,8 +177,16 @@ app.get('/api/reservations/folio/:folio', asyncHandler(async (req, res) => {
 
 // --- METRICS ---
 app.get('/api/metrics', authenticateToken, asyncHandler(async (req, res) => {
+  const { raffleId } = req.query;
+
   const raffles = await prisma.raffle.findMany();
-  const reservations = await prisma.reservation.findMany();
+  
+  const whereClause: any = {};
+  if (raffleId) {
+    whereClause.raffleId = raffleId;
+  }
+  
+  const reservations = await prisma.reservation.findMany({ where: whereClause });
   
   const totalRaffles = raffles.length;
   const activeRaffles = raffles.filter(r => r.status === 'active').length;
